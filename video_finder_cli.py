@@ -15,37 +15,57 @@ import time
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from typing import Optional, Tuple
+import argparse
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Define the video file path
-video_path = "02_6.mp4"
+#video_path = os.getenv('VIDEO_PATH', "02_6.mp4")  # Default to "02_6.mp4" if not set
+#frame_interval = int(os.getenv('FRAME_INTERVAL', 60))  # Default to 60 if not set
 
-client = ZhipuAI(api_key="e9182711c9fbf5130b6b73f190d4876c.GMzWcvTeuRBtOCIP")
+#client = ZhipuAI(api_key=os.getenv('ZHIPU_API_KEY'))
 
-def initialize_frame_descriptions():
+def get_output_filename(video_path):
+    """Generate output filename based on video filename"""
+    base_name = os.path.splitext(os.path.basename(video_path))[0]
+    return f"{base_name}_frame_descriptions.txt"
+
+def initialize_frame_descriptions(video_path):
     """Initialize frame_descriptions.txt from backup if it doesn't exist"""
-    if not os.path.exists('frame_descriptions.txt') and os.path.exists('frame_descriptions_backup.txt'):
-        print("Initializing frame_descriptions.txt from backup...")
-        with open('frame_descriptions_backup.txt', 'r') as src, open('frame_descriptions.txt', 'w') as dst:
+    output_file = get_output_filename(video_path)
+    backup_file = f"{output_file}.backup"
+    
+    if not os.path.exists(output_file) and os.path.exists(backup_file):
+        print(f"Initializing {output_file} from backup...")
+        with open(backup_file, 'r') as src, open(output_file, 'w') as dst:
             dst.write(src.read())
-        print("Successfully created frame_descriptions.txt from backup")
+        print(f"Successfully created {output_file} from backup")
         return True
-    return os.path.exists('frame_descriptions.txt')
+    return os.path.exists(output_file)
 
 def video_parse(video_path, frame_interval=60):
+    output_file = get_output_filename(video_path)
+    
     # Check if frame descriptions already exist
-    if os.path.exists('frame_descriptions.txt'):
+    if os.path.exists(output_file):
         print("Frame descriptions already exist, skipping video parsing...")
         return True
         
     cap = cv2.VideoCapture(video_path)
     frame_descriptions = []
     i = 0
-    frame_interval = 60
+    #frame_interval = 60
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    print(f"Total frames: {total_frames}")
 
     while(cap.isOpened()):
         ret, frame = cap.read()
         if ret:
             i += 1
+            #print(f"Processing {i} in raw")
             if (i % frame_interval) != 0:
                 continue
                 
@@ -61,7 +81,7 @@ def video_parse(video_path, frame_interval=60):
                         "content": [{
                             "type": "text",
                             "text": f"""You are a precise video frame analyzer. Please describe the scene in detail in English, following the instructions below:
-                            1.output the description in JSON format start with "{" and end with "}", with frame number {i} with "frame_number".
+                            1.output the description in JSON format start with "{" and end with "}", don't include any other text, with frame number {i} with "frame_number".
                             2.focusing on the person by describing the person's clothes, hair, and other details, contained in "person".
                             3.focusing on the car by describing the car's plate number, brand, model, color, and other details, contained in "car".
                             4.focusing on the scene by describing the scene's place and environment, weather, and other details, contained in "scene".
@@ -75,27 +95,52 @@ def video_parse(video_path, frame_interval=60):
                     }]
                 )
                 
+                # Debug: Print the raw response
+                # print(f"Raw response for frame {i}: {response}")
+                
                 # Validate JSON response
                 content = response.choices[0].message.content
-                # Try to parse as JSON to validate
-                json.loads(content)
-                frame_descriptions.append(content)
-                print(content)
                 
+                # Clean the content by removing backticks and "json" text
+                content = content.strip()
+                if content.startswith("```json"):
+                    content = content[7:]  # Remove ```json
+                elif content.startswith("```"):
+                    content = content[3:]  # Remove ```
+                if content.endswith("```"):
+                    content = content[:-3]  # Remove trailing ```
+                content = content.strip()
+                
+                # Debug: Print the cleaned content before parsing
+                print(f"Cleaned content for frame {i}: {content}")
+                
+                # Try to parse as JSON to validate
+                try:
+                    json.loads(content)
+                    frame_descriptions.append(content)
+                    print(f"Successfully parsed JSON for frame {i}")
+                except json.JSONDecodeError as e:
+                    print(f"JSON decode error for frame {i}: {e}")
+                    print(f"Problematic content: {content[:200]}...")
+                    continue
+                except Exception as e:
+                    print(f"Error processing frame {i}: {str(e)}")
+                    continue
+
             except Exception as e:
                 print(f"Error processing frame {i}: {str(e)}")
                 continue
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
         else:
             break
-
     cap.release()
 
     # Save only if we have descriptions
     if frame_descriptions:
-        with open('frame_descriptions.txt', 'w') as f:
+        with open(output_file, 'w') as f:
+            for description in frame_descriptions:
+                f.write(f"{description}\n")
+        # Create backup
+        with open(f"{output_file}.backup", 'w') as f:
             for description in frame_descriptions:
                 f.write(f"{description}\n")
         print(f"Saved {len(frame_descriptions)} frame descriptions")
@@ -429,19 +474,33 @@ def start_tracking(frame: np.ndarray, bbox: list, cap: cv2.VideoCapture, window_
             break
 
 def main():
-    # Add your API token here
-    api_token = "b1bd372e4a4aaad592852fa37a8a3267"
+    # Get API credentials from environment variables
+    zhipu_api_key = os.getenv('ZHIPU_API_KEY')
+    deepdataspace_api_token = os.getenv('DEEPDATASPACE_API_TOKEN')
+
+    if not zhipu_api_key or not deepdataspace_api_token:
+        print("Error: Missing API credentials in .env file")
+        exit(1)
+
+    # Initialize ZhipuAI client with API key from environment
+    global client
+    client = ZhipuAI(api_key=zhipu_api_key)
     
+    # Define the video file path and frame interval from environment variables
+    video_path = os.getenv('VIDEO_PATH', "02_6.mp4")  # Default to "02_6.mp4" if not set
+    frame_interval = int(os.getenv('FRAME_INTERVAL', 60))  # Default to 60 if not set
+
     # Initialize frame descriptions from backup if needed
-    if not initialize_frame_descriptions():
+    if not initialize_frame_descriptions(video_path):
         # Only parse video if we couldn't initialize from backup
-        if not video_parse(video_path):
+        if not video_parse(video_path, frame_interval):
             print("Failed to create frame descriptions")
             exit(1)
     
     # Create semantic index
+    output_file = get_output_filename(video_path)
     print("Creating semantic search index...")
-    index = create_semantic_index('frame_descriptions.txt')
+    index = create_semantic_index(output_file)
     if not index:
         print("No valid index created. Please check the frame descriptions format.")
         exit(1)
@@ -475,7 +534,7 @@ def main():
             
             if ret:
                 # Apply grounding to the frame
-                grounded_frame, current_bbox = ground_objects_in_frame(frame, query, api_token)
+                grounded_frame, current_bbox = ground_objects_in_frame(frame, query, deepdataspace_api_token)
                 
                 # Debug print
                 print(f"\nFrame {frame_num} bbox:", current_bbox)
