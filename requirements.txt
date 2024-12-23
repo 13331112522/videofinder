@@ -1,0 +1,10 @@
+requests
+opencv-python
+opencv-contrib-python
+numpy
+Pillow
+IPython
+scikit-learn
+matplotlib
+typing
+gradio
