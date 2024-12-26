@@ -8,3 +8,4 @@ scikit-learn
 matplotlib
 typing
 gradio
+python-dotenv==1.0.0

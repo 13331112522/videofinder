@@ -1,104 +1,81 @@
-# Video Finder
+# Video Finder Tool
 
-A Python-based video analysis tool that combines semantic search, object detection, and object tracking capabilities. The tool provides both GUI and CLI interfaces for searching and tracking objects in video content.
+## Overview
+
+The Video Finder Tool is designed to analyze video frames and provide detailed descriptions of scenes, objects, and events within the video. It utilizes advanced AI models to generate frame descriptions and allows users to perform semantic searches on the generated data.
 
 ## Features
 
-- **Semantic Search**: Search for specific objects, people, or scenes in videos using natural language queries
-- **Object Detection**: Precise object localization using grounding-based detection
-- **Object Tracking**: Real-time tracking of detected objects through video sequences
-- **Dual Interfaces**: 
-  - GUI mode for user-friendly interaction
-  - CLI mode for command-line operations
-- **Frame Analysis**: Detailed scene description including people, vehicles, and environmental details
+- **Frame Analysis**: Automatically analyzes video frames and generates detailed descriptions in JSON format.
+- **Semantic Search**: Allows users to search through frame descriptions using natural language queries.
+- **Grounded Segmentation**: Provides bounding boxes and labels for detected objects in the video frames.
+- **User Interface**: A graphical user interface (GUI) for easier interaction and visualization of results.
+- **Multi-language Support**: The GUI is available in both English and Chinese.
 
-## Installation
+## Requirements
 
-1. Clone the repository:
-
-bash
-git clone [repository-url]
-cd video-finder
-
-2. Install the required dependencies:
+Make sure to install the required packages listed in `requirements.txt`:
 
 bash
 pip install -r requirements.txt
 
+## Environment Variables
 
-3. Additional dependencies:
-- ZhipuAI API key (for semantic analysis)
-- DeepDataSpace API key (for object detection)
+Before running the application, set up the following environment variables in a `.env` file:
+
+
+ZHIPU_API_KEY=your_zhipu_api_key
+DEEPDATASPACE_API_TOKEN=your_deepdataspace_api_token
+VIDEO_PATH=path_to_your_video_file.mp4
+FRAME_INTERVAL=120 # Interval for frame analysis
 
 ## Usage
 
-### GUI Mode
+### Command Line Interface (CLI)
 
-Run the graphical interface:
+To run the video analysis using the command line interface, execute the following command:
 
-bash
-python video_finder_gui.py
-
-
-The GUI provides:
-- Video input selection
-- Text-based search queries
-- Real-time object detection visualization
-- Object tracking capabilities
-- Progress monitoring
-
-### CLI Mode
-
-Run the command-line interface:
 
 bash
 python video_finder_cli.py
 
+### Graphical User Interface (GUI)
 
-CLI Navigation:
-- `n`: Next frame
-- `p`: Previous frame
-- `t`: Start tracking
-- `q`: Quit current view
+To run the graphical user interface, execute the following command:
 
-## File Structure
+bash
+python video_finder_gui.py
 
-- `video_finder_gui.py`: Graphical user interface implementation
-- `video_finder_cli.py`: Command-line interface implementation
-- `requirements.txt`: Required Python packages
+### GUI in Chinese
 
-## Dependencies
+For a Chinese version of the GUI, execute:
 
-- requests: HTTP library for API calls
-- opencv-python & opencv-contrib-python: Video processing and object tracking
-- numpy: Numerical computations
-- Pillow: Image processing
-- IPython: Interactive computing
-- scikit-learn: Machine learning utilities
-- matplotlib: Visualization
-- typing: Type hints
 
-## API Requirements
+bash
+python video_finder_gui_zh.py
 
-The application requires two API keys:
-1. ZhipuAI API key for semantic analysis
-2. DeepDataSpace API key for object detection
+## How It Works
 
-Please ensure you have valid API keys before running the application.
+1. **Video Input**: The tool takes a video file as input, specified by the `VIDEO_PATH` environment variable.
+2. **Frame Processing**: The video is processed frame by frame, with descriptions generated based on the specified `FRAME_INTERVAL`.
+3. **Description Storage**: Frame descriptions are saved in a text file, and a backup is created for recovery.
+4. **Semantic Indexing**: A semantic index is created from the frame descriptions to facilitate efficient searching.
+5. **User Interaction**: Users can input queries to search for specific frames, and the results are displayed with bounding boxes around detected objects.
+
+## Troubleshooting
+
+If the analysis stops unexpectedly (e.g., at frame 420), consider the following:
+
+- **Video File Integrity**: Ensure that the video file is not corrupted and can be played without issues.
+- **Frame Processing Errors**: Check the console output for any error messages related to frame processing or API responses.
+- **API Limits**: Verify that you are not exceeding any API usage limits set by the ZhipuAI or DeepDataSpace services.
 
 ## License
 
-[Your chosen license]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Contributing
+## Acknowledgments
 
-[Your contribution guidelines]
-## Acknowledgements
-
-This project utilizes the following APIs:
-
-- [ZhipuAI API](https://open.bigmodel.cn/) - For semantic analysis and natural language processing capabilities
-- [DeepDataSpace (DDS) Cloud API Platform](https://deepdataspace.com/) - For object detection and computer vision functionality
-
-We thank both platforms for providing the API services that power core features of this application.
+- Thanks to the developers of the libraries used in this project, including OpenCV, NumPy, and others.
+- Special thanks to the ZhipuAI and DeepDataSpace teams for their powerful APIs.
 

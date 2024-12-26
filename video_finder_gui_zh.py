@@ -18,19 +18,20 @@ import sys
 from gradio import utils
 from dotenv import load_dotenv
 
-# Load environment variables
+# 加载环境变量
 load_dotenv()
 
-# Get API credentials and settings from environment variables
+# 从环境变量获取 API 凭证和设置
 DEFAULT_ZHIPU_API_KEY = os.getenv('ZHIPU_API_KEY', "default_key")
 DEFAULT_DEEPDATA_API_KEY = os.getenv('DEEPDATASPACE_API_TOKEN', "default_token")
 DEFAULT_VIDEO_PATH = os.getenv('VIDEO_PATH', "02_6.mp4")
 DEFAULT_FRAME_INTERVAL = int(os.getenv('FRAME_INTERVAL', 60))
 client = ZhipuAI(api_key=DEFAULT_ZHIPU_API_KEY)
+
 def get_output_filename(video_path):
     """Generate output filename based on video filename"""
     base_name = os.path.splitext(os.path.basename(video_path))[0]
-    return f"{base_name}_frame_descriptions.txt"
+    return f"{base_name}_frame_descriptions_zh.txt"
 
 def initialize_frame_descriptions(video_path):
     """Initialize frame_descriptions.txt from backup if it doesn't exist"""
@@ -81,12 +82,12 @@ def video_parse(video_path, frame_interval, zhipu_api_key=DEFAULT_ZHIPU_API_KEY,
                         "role": "user",
                         "content": [{
                             "type": "text",
-                            "text": f"""You are a precise video frame analyzer. Please describe the scene in detail in English, following the instructions below:
-                            1.output the description in JSON format start with "{" and end with "}", don't include any other text, with frame number {i} with "frame_number".
-                            2.focusing on the person by describing the person's clothes, hair, and other details, contained in "person".
-                            3.focusing on the car by describing the car's plate number, brand, model, color, and other details, contained in "car".
-                            4.focusing on the scene by describing the scene's place and environment, weather, and other details, contained in "scene".
-                            5.focusing on the event by describing what happened in the scene, contained in "event"."""
+                            "text": f"""你是一个精确的视频帧分析器。请按照以下说明详细描述场景，用英文描述:
+                            1.输出以 "{" 开头和 "}" 结尾的 JSON 格式描述，不包含任何其他文本，帧号为 {i}，用 "帧数" 表示。
+                            2.关注人物，描述人物的衣服、头发和其他细节，包含在 "行人" 中。
+                            3.关注汽车，描述汽车的车牌号、品牌、型号、颜色和其他细节，包含在 "车辆" 中。
+                            4.关注场景，描述场景的地点和环境、天气和其他细节，包含在 "场景" 中。
+                            5.关注事件，描述场景中发生的事情，包含在 "事件" 中。"""
                         }, {
                             "type": "image_url",
                             "image_url": {
@@ -170,7 +171,7 @@ def create_semantic_index(json_file_path):
                     continue
                     
                 frame_content = json.loads(json_str)
-                frame_num = frame_content.get('frame_number')
+                frame_num = frame_content.get('帧数')
                 
                 if not frame_num:
                     continue
@@ -179,7 +180,7 @@ def create_semantic_index(json_file_path):
                 texts = []
                 
                 # Process person field
-                if person := frame_content.get('person'):
+                if person := frame_content.get('行人'):
                     if isinstance(person, dict):
                         for value in person.values():
                             if isinstance(value, list):
@@ -192,7 +193,7 @@ def create_semantic_index(json_file_path):
                                 texts.append(str(value))
                 
                 # Process car field
-                if car := frame_content.get('car'):
+                if car := frame_content.get('车辆'):
                     if isinstance(car, list):
                         for car_item in car:
                             if isinstance(car_item, dict):
@@ -201,12 +202,12 @@ def create_semantic_index(json_file_path):
                         texts.extend(str(v) for v in car.values() if v)
                 
                 # Process scene field
-                if scene := frame_content.get('scene'):
+                if scene := frame_content.get('场景'):
                     if isinstance(scene, dict):
                         texts.extend(str(v) for v in scene.values() if v)
                 
                 # Add event text
-                if event := frame_content.get('event'):
+                if event := frame_content.get('事件'):
                     texts.append(str(event))
                 
                 # Combine all texts
@@ -304,6 +305,8 @@ def ground_objects_in_frame(frame, query, api_token):
     )
     json_resp = resp.json()
     
+    
+
     if json_resp['code'] != 0:
         print(f"Error initiating grounding task: {json_resp}")
         return frame, None
@@ -326,7 +329,8 @@ def ground_objects_in_frame(frame, query, api_token):
     result = json_resp["data"]["result"]
     output_frame = frame.copy()
     bbox = None
-    
+    #print(frame, query, api_token)
+    #print(result)
     for obj in result.get("objects", []):
         # Get bounding box if available
         if obj.get("bbox"):
@@ -353,6 +357,8 @@ def ground_objects_in_frame(frame, query, api_token):
             output_frame = cv2.addWeighted(output_frame, 0.7, mask_overlay, 0.3, 0)
     
     return output_frame, bbox
+
+
 def initialize_tracker(tracker_type='KCF'):
     """Initialize OpenCV tracker based on the specified type."""
     if tracker_type == 'CSRT':
@@ -427,37 +433,36 @@ def quit_app():
         # If the above doesn't work, use a more aggressive exit
         os._exit(0)
 
+
 def gradio_interface(zhipu_api_key, deepdata_api_key, video_input, text_query, frame_interval, progress=gr.Progress()):
-    # Set API keys
+    # 设置 API 密钥
     api_token = deepdata_api_key or DEFAULT_DEEPDATA_API_KEY
     zhipu_api_key = zhipu_api_key or DEFAULT_ZHIPU_API_KEY
     
     if not text_query:
-        return None, 0, "Please provide a text query."
+        return None, 0, "请提供搜索查询。"
     
     output_file = get_output_filename(video_input)
     
-    # Check if frame descriptions exist
+    # 检查帧描述文件是否存在
     if not os.path.exists(output_file):
         if not video_input:
-            return None, 0, "Please provide a video input or ensure frame descriptions exist."
+            return None, 0, "请提供视频输入或确保帧描述文件存在。"
         
         if not frame_interval:
-            return None, 0, "Please provide a frame interval."
+            return None, 0, "请提供帧间隔。"
             
-        # Process video to create frame descriptions
-        print("Processing video to create frame descriptions...")
+        # 处理视频以创建帧描述
+        print("正在处理视频以创建帧描述...")
         frame_descriptions = video_parse(video_input, int(frame_interval), zhipu_api_key, progress)
     else:
-        print("Found existing frame descriptions, skipping video processing...")
+        print("找到已存在的帧描述，跳过视频处理...")
     
-    # Create semantic search index
-    print("Creating semantic search index...")
+    # 创建语义搜索索引
+    print("正在创建语义搜索索引...")
     index = create_semantic_index(output_file)
     if not index:
-        return None, 0, "No valid index created. Please check the frame descriptions format."
-    
-    # Perform semantic search
+        return None, 0, "未创建有效索引。请检查帧描述格式。"
     print("Performing semantic search...")
     results = semantic_search(index, text_query)
     
@@ -476,16 +481,14 @@ def gradio_interface(zhipu_api_key, deepdata_api_key, video_input, text_query, f
     
     if not ret:
         return None, 1, f"Could not read frame {frame_num}"
-    
-    # Ground the objects in the frame
+       # Ground the objects in the frame
     processed_frame, bbox = ground_objects_in_frame(frame, text_query, api_token)
-    #print(f"Found bounding box: {bbox}")
+    
     if bbox is None:
         return frame, 1, f"Found frame {frame_num} but could not ground objects"
     
-    return processed_frame, 1, f"Found and grounded objects in frame {frame_num}"
+    return processed_frame, 1, f"已在帧 {frame_num} 中找到并定位对象"
 
-    # ...rest of the existing interface code...
 def track_current_object():
     """Start tracking the current object"""
     if not current_video.value or not current_frame.value or not current_bbox.value:
@@ -544,74 +547,99 @@ def track_current_object():
     
     return temp_output, "Tracking completed"
 
-# GUI Interface setup
+def quit_app():
+    """退出应用程序"""
+    try:
+        cv2.destroyAllWindows()
+        import signal
+        os.kill(os.getpid(), signal.SIGTERM)
+    except:
+        os._exit(0)
+
+# GUI 界面设置
 with gr.Blocks() as iface:
-    # ...existing interface code with updated defaults...
     current_frame = gr.State(None)
     current_bbox = gr.State(None)
     current_video = gr.State(None)
+    
     with gr.Row():
         with gr.Column():
             zhipu_api_key = gr.Textbox(
-                label="ZhipuAI API Key",
+                label="智谱 AI API 密钥",
                 type="password",
                 value=DEFAULT_ZHIPU_API_KEY
             )
             deepdata_api_key = gr.Textbox(
-                label="DeepDataSpace API Key",
+                label="DeepDataSpace API 密钥",
                 type="password",
                 value=DEFAULT_DEEPDATA_API_KEY
             )
             video_input = gr.Video(
-                label="Video Input (optional if frame descriptions exist)"
+                label="视频输入（如果帧描述文件存在则可选）"
             )
-            text_query = gr.Textbox(label="Text Query")
+            text_query = gr.Textbox(label="文本查询")
             frame_interval = gr.Number(
-                label="Frame Interval (only used for new video processing)",
+                label="帧间隔（仅用于新视频处理）",
                 value=DEFAULT_FRAME_INTERVAL,
                 minimum=1
             )
+            
             with gr.Row():
-                process_button = gr.Button("Start Processing")
-                track_button = gr.Button("Track")
-                quit_button = gr.Button("Quit")
+                process_button = gr.Button("开始处理")
+                track_button = gr.Button("追踪")
+                quit_button = gr.Button("退出")
                 
         with gr.Column():
-            # Separate outputs for grounding and tracking
-            grounding_output = gr.Image(label="Grounding Result")  # Changed from video_output to grounding_output
-            tracking_output = gr.Video(label="Tracking Result")    # New video output for tracking
-            progress_bar = gr.Slider(label="Progress", minimum=0, maximum=1, value=0)
-            status_text = gr.Textbox(label="Status", interactive=False)
+            grounding_output = gr.Image(label="定位结果")
+            tracking_output = gr.Video(label="追踪结果")
+            progress_bar = gr.Slider(label="进度", minimum=0, maximum=1, value=0)
+            status_text = gr.Textbox(label="状态", interactive=False)
     
     def process_and_update_state(zhipu_key, deepdata_key, video, query, interval):
-        """Process video and store state for tracking"""
+        """处理视频并存储追踪状态"""
         result = gradio_interface(zhipu_key, deepdata_key, video, query, interval)
         if result:
             frame, progress, status = result
-            # Update Gradio state values
             current_video.value = video
             
-            # Extract frame number from status
-            if isinstance(status, str) and "frame" in status:
-                try:
-                    frame_num = int(status.split("frame")[1].split()[0])
-                    current_frame.value = frame_num
+            # 改进帧号提取和边界框处理
+            try:
+                # Extract frame number from either Chinese or English status message
+                if isinstance(status, str):
+                    if "帧" in status:
+                        frame_num = int(''.join(filter(str.isdigit, status.split("帧")[1].split()[0])))
+                    elif "frame" in status.lower():
+                        frame_num = int(''.join(filter(str.isdigit, status.split("frame")[1].split()[0])))
+                    else:
+                        raise ValueError("无法从状态消息中提取帧号")
                     
-                    # Get the bbox from ground_objects_in_frame
+                    current_frame.value = frame_num
+                    print(f"处理帧号: {frame_num}")  # Debug print
+                    
+                    # 重新获取原始帧并进行目标定位
                     cap = cv2.VideoCapture(video)
                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num - 1)
                     ret, frame = cap.read()
                     cap.release()
                     
                     if ret:
+                        # 确保使用原始帧和原始查询进行定位
                         _, bbox = ground_objects_in_frame(frame, query, deepdata_key)
-                        current_bbox.value = bbox
-                        print(f"Stored bbox: {bbox}")  # Debug print
-                except Exception as e:
-                    print(f"Error capturing bbox: {e}")
-                    pass
+                        if bbox is not None:
+                            current_bbox.value = bbox
+                            print(f"找到边界框: {bbox}")  # Debug print
+                        else:
+                            print("目标定位未返回边界框")  # Debug print
+                    else:
+                        print(f"无法读取帧 {frame_num}")  # Debug print
+                        
+            except Exception as e:
+                print(f"处理边界框时出错: {str(e)}")
+                import traceback
+                print(traceback.format_exc())  # Print full traceback for debugging
+                
         return result
-    
+
     def track_current_object():
         """Start tracking the current object"""
         if not current_video.value or not current_frame.value or not current_bbox.value:
@@ -696,8 +724,5 @@ with gr.Blocks() as iface:
     iface.load(lambda: None, None, None, every=0.1)  # Refresh the interface periodically
 
 if __name__ == "__main__":
-    iface.queue()  # Enable queueing if needed
+    iface.queue()
     iface.launch(show_error=True)
-    # ...rest of the existing interface code...
-
-# ...rest of the existing code...
