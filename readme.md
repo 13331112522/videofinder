@@ -25,8 +25,11 @@ Before running the application, set up the following environment variables in a 
 
 
 ZHIPU_API_KEY=your_zhipu_api_key
+
 DEEPDATASPACE_API_TOKEN=your_deepdataspace_api_token
+
 VIDEO_PATH=path_to_your_video_file.mp4
+
 FRAME_INTERVAL=120 # Interval for frame analysis
 
 ## Usage
